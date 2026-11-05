@@ -125,7 +125,7 @@ def run_jev_candidates(index):
         confidence = None
     return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),**score_box(box,stage),'seconds':time.perf_counter()-start,'model':'YuNet + '+payload.get('model',MODEL)}
 
-def run_sonnet(index):
+def run_claude(index, model_id):
     cli = shutil.which('claude.cmd') or shutil.which('claude')
     if not cli:
         raise RuntimeError('Claude Codeが見つかりません')
@@ -144,11 +144,11 @@ def run_sonnet(index):
                   'Give a tight bounding box around only the visible face of that person in the SCENE, not the body, as normalized 0 to 1 coordinates '
                   'in JSON only: {"box": [left, top, right, bottom]}. Do not use any other files or tools.')
         started = time.perf_counter()
-        proc = subprocess.run([cli, '-p', prompt, '--model', 'claude-sonnet-5-5', '--safe-mode', '--restricted', '--strict-mcp-config', '--tools', 'Read', '--allowedTools', 'Read', '--permission-mode', 'dontAsk', '--output-format', 'json'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180, env=env, cwd=ROOT)
+        proc = subprocess.run([cli, '-p', prompt, '--model', model_id, '--safe-mode', '--restricted', '--strict-mcp-config', '--tools', 'Read', '--allowedTools', 'Read', '--permission-mode', 'dontAsk', '--output-format', 'json'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180, env=env, cwd=ROOT)
         elapsed = time.perf_counter()-started
         payload = json.loads(proc.stdout)
         if proc.returncode or payload.get('is_error'):
-            raise RuntimeError('Sonnetの実行に失敗しました。Claude Codeの認証または利用上限を確認してください')
+            raise RuntimeError('Claudeの実行に失敗しました。Claude Codeの認証または利用上限を確認してください')
         response = payload.get('result', '').strip()
         parsed = None
         for offset, char in enumerate(response):
@@ -165,12 +165,18 @@ def run_sonnet(index):
         coords = parsed['box']
         if not isinstance(coords, list) or len(coords) != 4 or any(isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n) or not 0 <= n <= 1 for n in coords) or coords[0] >= coords[2] or coords[1] >= coords[3]:
             raise ValueError('invalid box')
-        model = next(iter(payload.get('modelUsage', {})), 'Sonnet (Claude Code)')
+        model = next(iter(payload.get('modelUsage', {})), model_id)
         return {'box': coords, 'confidence': None, **score_box(coords, stage), 'seconds': elapsed, 'model': model}
     except (json.JSONDecodeError, KeyError, ValueError):
-        raise RuntimeError('Sonnetの矩形応答または認証情報を解釈できません') from None
+        raise RuntimeError('Claudeの矩形応答または認証情報を解釈できません') from None
     except subprocess.TimeoutExpired:
-        raise RuntimeError('Sonnetがタイムアウトしました') from None
+        raise RuntimeError('Claudeがタイムアウトしました') from None
+
+def run_sonnet(index):
+    return run_claude(index, 'claude-sonnet-5-5')
+
+def run_opus(index):
+    return run_claude(index, 'opus')
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
