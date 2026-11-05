@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'docs/media'
 RESULT = ROOT / 'results/face_benchmark_20261105_135020.json'
 CANDIDATE_RESULT = ROOT / 'results/jev_candidates_benchmark_20261105_155333.json'
+TERRA_RESULT = ROOT / 'results/terra_benchmark_20261105_160045.json'
 NAMES = ['Jev', 'Sonnet 5.5', 'YuNet + SFace']
 
 
@@ -24,6 +25,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     report = json.loads(RESULT.read_text(encoding='utf-8'))
     candidate_report = json.loads(CANDIDATE_RESULT.read_text(encoding='utf-8'))
+    terra_report = json.loads(TERRA_RESULT.read_text(encoding='utf-8'))
     shutil.copyfile(next((ROOT/'hiroyuki').glob('*.png')), OUT/'reference.png')
     font_path = Path('C:/Windows/Fonts/arial.ttf')
     font = ImageFont.truetype(str(font_path), 20) if font_path.exists() else ImageFont.load_default()
@@ -72,6 +74,19 @@ def main():
         status = 'MATCH' if row['correct'] else ('MISS: none selected' if row['box'] is None else 'MISS')
         ImageDraw.Draw(result_image).text((12, 13), f'YuNet + Jev  |  {status}  |  {row["wall_seconds"]:.2f} s', font=font, fill='#171717')
         result_image.save(OUT/f'jev-candidates-stage{i+1}.jpg', quality=90)
+
+        row = terra_report['stages'][i]
+        panel = scene.copy()
+        pen = ImageDraw.Draw(panel)
+        outlined(pen, rect_pixels(row['target_box'], width, height), '#ffdb42', 5)
+        if row.get('box'):
+            outlined(pen, rect_pixels(row['box'], width, height), '#ff4949', 5)
+        panel = panel.resize((panel_width, panel_height), Image.Resampling.LANCZOS)
+        result_image = Image.new('RGB', (panel_width, panel_height+50), '#f5f2ea')
+        result_image.paste(panel, (0, 50))
+        status = 'MATCH' if row.get('correct') else 'MISS'
+        ImageDraw.Draw(result_image).text((12, 13), f'GPT-6.1 Terra  |  {status}  |  {row["wall_seconds"]:.2f} s', font=font, fill='#171717')
+        result_image.save(OUT/f'terra-stage{i+1}.jpg', quality=90)
 
 
 if __name__ == '__main__':

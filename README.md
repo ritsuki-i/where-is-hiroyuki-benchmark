@@ -32,6 +32,7 @@
 |---|---|---|
 | **Jev 1.14.0** | TypeSafeのモデル。参照画像とステージ画像を渡し、該当する顔の矩形をBox機能で求める。 | TypeSafe API |
 | **Claude Sonnet 5.5** | Anthropicの画像を理解できるモデル。2枚の画像を読み、対象の顔の矩形を座標で返す。 | Claude Code、サブスク認証 |
+| **GPT-6.1 Terra** | OpenAIの画像入力に対応するモデル。参照画像とステージ画像を直接添付し、顔の矩形を求める。 | ChatGPT認証のCodex CLI |
 | **Claude Opus 5.5** | Anthropicの画像を理解できるモデル。Sonnetと同じ指示で顔の矩形を座標で返す。 | Claude Code、サブスク認証 |
 | **YuNet + SFace** | OpenCVの顔検出モデルYuNetで顔候補を見つけ、顔照合モデルSFaceで参照画像との類似度が最も高い候補を選ぶ。 | ローカル実行、追加学習なし |
 | **YuNet + Jev** | YuNetが検出した全顔候補を番号付き一覧にし、参照画像に似た候補をJevに選ばせる。 | ローカルのYuNet + TypeSafe API |
@@ -65,6 +66,10 @@ JevとSonnetには顔を囲むよう指示し、YuNet + SFaceは検出した顔�
 | YuNet + Jev | 3 / 5 | 60% | 7.00秒 | 1.40秒 |
 
 SonnetとOpusはともにステージ5を外し、YuNet + Jevはステージ3と5で「該当なし」を選びました。[各ステージの再実験記録](results/five_method_benchmark_20261105_155632.md)も参照してください。Web画面に最終的に表示する手法は未決定です。
+
+### GPT-6.1 Terraの追加実験
+
+GPT-6.1 Terraは別の時刻に同じ5ステージを1回ずつ評価し、**5/5問正解（100%）、合計52.39秒、平均10.48秒／問**でした。ステージごとの結果は[詳細記録](results/terra_benchmark_20261105_160045.md)、予測枠は[推論結果の画像](docs/inference-results.md#gpt-61-terra)を参照してください。ChatGPT認証のCodex CLIに画像を直接添付しており、Claude Codeとは画像の渡し方や実行基盤が異なります。
 
 ### 前回の実験
 

@@ -46,4 +46,28 @@
 
 ![ステージ5のYuNetとJevによる結果](media/jev-candidates-stage5.jpg)
 
+## GPT-6.1 Terra
+
+別時刻の追加実験です。赤が予測顔枠、黄色が概算の正解顔枠です。
+
+**ステージ1**
+
+![GPT-6.1 Terraのステージ1の結果](media/terra-stage1.jpg)
+
+**ステージ2**
+
+![GPT-6.1 Terraのステージ2の結果](media/terra-stage2.jpg)
+
+**ステージ3**
+
+![GPT-6.1 Terraのステージ3の結果](media/terra-stage3.jpg)
+
+**ステージ4**
+
+![GPT-6.1 Terraのステージ4の結果](media/terra-stage4.jpg)
+
+**ステージ5**
+
+![GPT-6.1 Terraのステージ5の結果](media/terra-stage5.jpg)
+
 [READMEに戻る](../README.md)

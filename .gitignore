@@ -29,6 +29,7 @@ service-account*.json
 !/results/face_benchmark_20261105_135020.md
 !/results/jev_candidates_benchmark_20261105_155333.md
 !/results/five_method_benchmark_20261105_155632.md
+!/results/terra_benchmark_20261105_160045.md
 
 # Local environments, caches, logs, and editor / OS files
 .venv/
