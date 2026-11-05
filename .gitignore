@@ -1,0 +1,44 @@
+# Credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# User-provided images, generated scenes, annotations and derivatives.
+# Review rights and personal information before explicitly sharing these.
+/hiroyuki/
+/data/
+
+# Downloaded model weights and local inference artifacts
+/models/
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.gguf
+
+# Raw benchmark outputs may contain coordinates and local details.
+# Only explicitly reviewed summaries are eligible for Git.
+/results/*
+!/results/.gitkeep
+!/results/face_benchmark_20261105_135020.md
+
+# Local environments, caches, logs, and editor / OS files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
