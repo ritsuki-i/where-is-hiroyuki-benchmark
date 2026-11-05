@@ -1,73 +1,13 @@
-# 推論結果の画像
+# 4手法の推論結果
 
-各ステージの左からJev、Sonnet 5.5、YuNet + SFaceの結果です。**赤が予測した顔枠、黄色が概算の正解顔枠**です。MATCHは中心位置による暫定正解、MISSは不正解を表します。画像を開くと拡大して確認できます。
+各ページに、Jev・YuNet + Clef・Claude Opus 5.5・YuNet + SFaceの結果を2×2で並べています。赤が予測枠、黄色が概算の正解顔枠です。画像はクリックして拡大できます。
 
-**ステージ1**
+- [ステージ1](stage1.md)
+- [ステージ2](stage2.md)
+- [ステージ3](stage3.md)
+- [ステージ4](stage4.md)
+- [ステージ5](stage5.md)
 
-![ステージ1の3手法の推論結果](media/results-stage1.jpg)
+掲載しているJevの予測は、顔枠を指示した2026年11月5日の結果です。現在のレース画面では、Jev単体は人物の可視部分を予測し、人物枠で判定します。ClefはYuNetの候補一覧から選択した、11月6日の結果です。4手法は同時に測定したものではありません。
 
-**ステージ2**
-
-![ステージ2の3手法の推論結果](media/results-stage2.jpg)
-
-**ステージ3**
-
-![ステージ3の3手法の推論結果](media/results-stage3.jpg)
-
-**ステージ4**
-
-![ステージ4の3手法の推論結果](media/results-stage4.jpg)
-
-**ステージ5**
-
-![ステージ5の3手法の推論結果](media/results-stage5.jpg)
-
-## YuNet + Jev：候補一覧からの選択
-
-別の時刻に実施した追加実験です。黄色は正解顔枠、赤はYuNetから選ばれた顔枠を示します。ステージ3と5は「該当なし」を選んだため赤枠はありません。
-
-**ステージ1**
-
-![ステージ1のYuNetとJevによる結果](media/jev-candidates-stage1.jpg)
-
-**ステージ2**
-
-![ステージ2のYuNetとJevによる結果](media/jev-candidates-stage2.jpg)
-
-**ステージ3**
-
-![ステージ3のYuNetとJevによる結果](media/jev-candidates-stage3.jpg)
-
-**ステージ4**
-
-![ステージ4のYuNetとJevによる結果](media/jev-candidates-stage4.jpg)
-
-**ステージ5**
-
-![ステージ5のYuNetとJevによる結果](media/jev-candidates-stage5.jpg)
-
-## GPT-6.1 Terra
-
-別時刻の追加実験です。赤が予測顔枠、黄色が概算の正解顔枠です。
-
-**ステージ1**
-
-![GPT-6.1 Terraのステージ1の結果](media/terra-stage1.jpg)
-
-**ステージ2**
-
-![GPT-6.1 Terraのステージ2の結果](media/terra-stage2.jpg)
-
-**ステージ3**
-
-![GPT-6.1 Terraのステージ3の結果](media/terra-stage3.jpg)
-
-**ステージ4**
-
-![GPT-6.1 Terraのステージ4の結果](media/terra-stage4.jpg)
-
-**ステージ5**
-
-![GPT-6.1 Terraのステージ5の結果](media/terra-stage5.jpg)
-
-[READMEに戻る](../README.md)
+[追加・補助実験](additional-experiments.md) ｜ [READMEに戻る](../README.md)

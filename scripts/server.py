@@ -4,6 +4,7 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -30,6 +31,19 @@ def read_key():
             return line.split('=',1)[1].strip().strip('"\'')
     return ''
 
+def read_setting(name):
+    value = os.environ.get(name, '').strip()
+    if value:
+        return value
+    path = ROOT/'.env.local'
+    if not path.exists():
+        return ''
+    for line in path.read_text(encoding='utf-8-sig').splitlines():
+        key, separator, value = line.strip().partition('=')
+        if separator and key == name:
+            return value.strip().strip('"\'')
+    return ''
+
 def asset(path):
     im = Image.open(path).convert('RGB')
     return image_asset(im)
@@ -40,9 +54,9 @@ def image_asset(im):
     im.save(out, format='JPEG', quality=90)
     return {'type':'image','format':'jpg','data_base64':base64.b64encode(out.getvalue()).decode('ascii')}
 
-def score_box(coords, stage):
+def score_box(coords, stage, target_kind='face'):
     width, height = stage['width'], stage['height']
-    gx1, gy1, gx2, gy2 = stage['face_bbox_xyxy_approx']
+    gx1, gy1, gx2, gy2 = stage['bbox_xyxy_approx' if target_kind == 'person' else 'face_bbox_xyxy_approx']
     target = [gx1/width, gy1/height, gx2/width, gy2/height]
     if coords is None:
         return {'target_box': target, 'correct': False}
@@ -54,8 +68,8 @@ def score_box(coords, stage):
     prediction_area = (x2-x1) * (y2-y1)
     coverage = intersection / target_area
     iou = intersection / (target_area + prediction_area - intersection)
-    return {'target_box':target, 'coverage':coverage, 'iou':iou,
-            'correct':target[0] <= (x1+x2)/2 <= target[2] and target[1] <= (y1+y2)/2 <= target[3]}
+    correct = (coverage >= 0.5 and iou >= 0.1) if target_kind == 'person' else (target[0] <= (x1+x2)/2 <= target[2] and target[1] <= (y1+y2)/2 <= target[3])
+    return {'target_box':target, 'coverage':coverage, 'iou':iou, 'correct':correct}
 
 def run_jev(index):
     key=read_key()
@@ -65,7 +79,7 @@ def run_jev(index):
     target_ref='target-'+uuid.uuid4().hex
     body={'model':MODEL,'state':{'scene':scene_ref,'reference':target_ref},
           'assets':{scene_ref:asset(ROOT/'data/stages_v3'/stage['image']),target_ref:asset(REFERENCE)},
-          'questions':{'target':{'type':'box','instructions':'Locate in `scene` the person whose face matches the character in `reference`. His clothes and pose may differ. Return a tight box around only the visible face in `scene`, not the body or reference image.'}}}
+          'questions':{'target':{'type':'box','instructions':'Locate in `scene` the person whose face matches the character in `reference`. His clothes and pose may differ; return the visible person, not the reference image.'}}}
     req=urllib.request.Request('https://api.typesafe.ai/v1/systemone', data=json.dumps(body).encode(), method='POST', headers={'Authorization':'Bearer '+key,'Content-Type':'application/json','TypeSafe-Danger-Zone-Images':'true'})
     start=time.perf_counter()
     try:
@@ -83,7 +97,7 @@ def run_jev(index):
     confidence=answer.get('confidence')
     if isinstance(confidence,bool) or not isinstance(confidence,(int,float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
         confidence=None
-    return {'box':coords,'confidence':confidence,**score_box(coords,stage),'seconds':elapsed,'model':payload.get('model',MODEL)}
+    return {'box':coords,'confidence':confidence,**score_box(coords,stage,'person'),'seconds':elapsed,'model':payload.get('model',MODEL)}
 
 def run_face(index):
     from face_search import search
@@ -124,6 +138,53 @@ def run_jev_candidates(index):
     if isinstance(confidence, bool) or not isinstance(confidence, (int,float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
         confidence = None
     return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),**score_box(box,stage),'seconds':time.perf_counter()-start,'model':'YuNet + '+payload.get('model',MODEL)}
+
+def run_clef(index):
+    """Select a YuNet face candidate using Cloudflare Workers AI Clef."""
+    from jev_candidates import make_candidates
+    start = time.perf_counter()
+    token = read_setting('CLOUDFLARE_API_TOKEN')
+    account = read_setting('CLOUDFLARE_ACCOUNT_ID')
+    if not token or not account:
+        raise RuntimeError('CLOUDFLARE_API_TOKEN または CLOUDFLARE_ACCOUNT_ID が設定されていません')
+    if not re.fullmatch(r'[0-9a-fA-F]{32}', account):
+        raise RuntimeError('CloudflareアカウントIDの形式が不正です')
+    stage = STAGES[index]
+    sheet, boxes = make_candidates(ROOT/'data/stages_v3'/stage['image'])
+    if not boxes:
+        return {'box':None,'confidence':None,'choice':'none','candidates':0,
+                **score_box(None,stage),'seconds':time.perf_counter()-start,'model':'@cf/cloudflare/clef'}
+    options = {f'face_{i+1:03d}':f'The face labeled face_{i+1:03d} in the candidate sheet.' for i in range(len(boxes))}
+    options['none'] = 'None of the candidate faces matches the reference.'
+    images = ['data:image/jpeg;base64,'+asset(REFERENCE)['data_base64'],
+              'data:image/jpeg;base64,'+image_asset(sheet)['data_base64']]
+    body = {'model':'clef', 'images':images,
+            'state':'The first image is the reference character. The second image is a numbered candidate face sheet.',
+            'questions':{'target':{'type':'choice',
+                                   'instructions':'Which labeled face in the second image matches the person in the first image? Select the exact face label, or none if no face matches.',
+                                   'criteria':options}}}
+    url = f'https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef'
+    req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), method='POST',
+                                 headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+    try:
+        with urllib.request.urlopen(req,timeout=90) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f'Cloudflare Clef API HTTP {exc.code}') from None
+    if not isinstance(payload,dict) or not payload.get('success') or not isinstance(payload.get('result'),dict):
+        raise RuntimeError('Cloudflare Clef APIがエラーを返しました')
+    result = payload['result']
+    answer = result.get('answers',{}).get('target',{})
+    choice = answer.get('choice') if isinstance(answer,dict) else None
+    if choice not in options:
+        raise RuntimeError('Cloudflare Clefの候補選択を解釈できません')
+    box = None if choice == 'none' else boxes[int(choice[5:])-1]
+    confidence = answer.get('confidence')
+    if isinstance(confidence,bool) or not isinstance(confidence,(int,float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        confidence = None
+    return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),
+            **score_box(box,stage),'seconds':time.perf_counter()-start,'model':'@cf/cloudflare/clef',
+            'usage':result.get('usage')}
 
 def run_claude(index, model_id):
     cli = shutil.which('claude.cmd') or shutil.which('claude')
@@ -176,7 +237,7 @@ def run_sonnet(index):
     return run_claude(index, 'claude-sonnet-5-5')
 
 def run_opus(index):
-    return run_claude(index, 'opus')
+    return run_claude(index, 'claude-opus-5-5')
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
@@ -189,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
         path,mime=routes[self.path]
         return self.respond(200,(ROOT/path).read_bytes(),mime)
     def do_POST(self):
-        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/jev-candidates'): return self.respond(404,b'Not found','text/plain')
+        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/opus','/api/jev-candidates','/api/clef'): return self.respond(404,b'Not found','text/plain')
         # Prevent browser cross-origin and DNS-rebinding requests to this local proxy.
         if self.headers.get('Host') not in ('127.0.0.1:8765','localhost:8765') or self.headers.get('Origin') not in ('http://127.0.0.1:8765','http://localhost:8765'):
             return self.respond(403,b'{"error":"Forbidden"}')
@@ -199,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             index=body.get('stage')
             if type(index) is not int or index not in range(1,6): raise ValueError('invalid stage')
-            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/jev-candidates':run_jev_candidates}[self.path](index-1)
+            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/opus':run_opus,'/api/jev-candidates':run_jev_candidates,'/api/clef':run_clef}[self.path](index-1)
             self.respond(200,json.dumps(result).encode())
         except (ValueError,RuntimeError,urllib.error.URLError,TimeoutError,OSError) as e:
             message=str(e) if isinstance(e,(ValueError,RuntimeError)) else 'Jev API への接続に失敗しました'
