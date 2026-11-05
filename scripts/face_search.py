@@ -7,6 +7,18 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def detect_faces(image_path):
+    detector_path = ROOT / 'models/yunet.onnx'
+    if not detector_path.exists():
+        raise RuntimeError('YuNetモデルがありません。READMEの準備手順を確認してください')
+    detector = cv2.FaceDetectorYN.create(str(detector_path), '', (320, 320), 0.6, 0.3, 5000)
+    image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise RuntimeError('画像を読み込めません')
+    detector.setInputSize((image.shape[1], image.shape[0]))
+    _, faces = detector.detect(image)
+    return image, [] if faces is None else sorted(faces, key=lambda f: (float(f[1]), float(f[0])))
+
 
 def search(image_path, reference_path):
     start = time.perf_counter()

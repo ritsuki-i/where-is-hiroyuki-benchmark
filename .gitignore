@@ -27,6 +27,7 @@ service-account*.json
 /results/*
 !/results/.gitkeep
 !/results/face_benchmark_20261105_135020.md
+!/results/jev_candidates_benchmark_20261105_155333.md
 
 # Local environments, caches, logs, and editor / OS files
 .venv/

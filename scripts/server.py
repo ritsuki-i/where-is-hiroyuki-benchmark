@@ -32,6 +32,9 @@ def read_key():
 
 def asset(path):
     im = Image.open(path).convert('RGB')
+    return image_asset(im)
+
+def image_asset(im):
     im.thumbnail((1568,1568), Image.Resampling.LANCZOS)
     out = io.BytesIO()
     im.save(out, format='JPEG', quality=90)
@@ -88,6 +91,39 @@ def run_face(index):
     result = search(ROOT/'data/stages_v3'/stage['image'], REFERENCE)
     result.update(**score_box(result['box'], stage), model='YuNet + SFace')
     return result
+
+def run_jev_candidates(index):
+    from jev_candidates import make_candidates
+    start = time.perf_counter()
+    key = read_key()
+    if not key:
+        raise RuntimeError('TYPESAFE_API_KEY が設定されていません')
+    stage = STAGES[index]
+    sheet, boxes = make_candidates(ROOT/'data/stages_v3'/stage['image'])
+    if not boxes:
+        return {'box':None, 'confidence':None, 'candidates':0, **score_box(None, stage), 'seconds':time.perf_counter()-start, 'model':'YuNet + Jev'}
+    sheet_ref = 'candidates-'+uuid.uuid4().hex
+    target_ref = 'reference-'+uuid.uuid4().hex
+    choices = {f'face_{i+1:03d}': f'The face labeled face_{i+1:03d} in the candidate sheet.' for i in range(len(boxes))}
+    choices['none'] = 'None of the candidate faces matches the reference.'
+    body = {'model':MODEL, 'state':{'reference':target_ref,'candidate_sheet':sheet_ref},
+            'assets':{target_ref:asset(REFERENCE),sheet_ref:image_asset(sheet)},
+            'questions':{'target':{'type':'choice', 'instructions':'Which labeled face in candidate_sheet matches the person in reference? Select its exact label, or none if no face matches.', 'criteria':choices}}}
+    req = urllib.request.Request('https://api.typesafe.ai/v1/systemone', data=json.dumps(body).encode(), method='POST', headers={'Authorization':'Bearer '+key,'Content-Type':'application/json','TypeSafe-Danger-Zone-Images':'true'})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f'Jev API HTTP {e.code}') from e
+    answer = payload.get('answers', {}).get('target', {})
+    choice = answer.get('choice')
+    if choice not in choices:
+        raise RuntimeError('Jevの候補選択を解釈できません')
+    box = None if choice == 'none' else boxes[int(choice[5:])-1]
+    confidence = answer.get('confidence')
+    if isinstance(confidence, bool) or not isinstance(confidence, (int,float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        confidence = None
+    return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),**score_box(box,stage),'seconds':time.perf_counter()-start,'model':'YuNet + '+payload.get('model',MODEL)}
 
 def run_sonnet(index):
     cli = shutil.which('claude.cmd') or shutil.which('claude')
@@ -147,7 +183,7 @@ class Handler(BaseHTTPRequestHandler):
         path,mime=routes[self.path]
         return self.respond(200,(ROOT/path).read_bytes(),mime)
     def do_POST(self):
-        if self.path not in ('/api/jev','/api/face','/api/sonnet'): return self.respond(404,b'Not found','text/plain')
+        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/jev-candidates'): return self.respond(404,b'Not found','text/plain')
         # Prevent browser cross-origin and DNS-rebinding requests to this local proxy.
         if self.headers.get('Host') not in ('127.0.0.1:8765','localhost:8765') or self.headers.get('Origin') not in ('http://127.0.0.1:8765','http://localhost:8765'):
             return self.respond(403,b'{"error":"Forbidden"}')
@@ -157,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             index=body.get('stage')
             if type(index) is not int or index not in range(1,6): raise ValueError('invalid stage')
-            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet}[self.path](index-1)
+            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/jev-candidates':run_jev_candidates}[self.path](index-1)
             self.respond(200,json.dumps(result).encode())
         except (ValueError,RuntimeError,urllib.error.URLError,TimeoutError,OSError) as e:
             message=str(e) if isinstance(e,(ValueError,RuntimeError)) else 'Jev API への接続に失敗しました'
