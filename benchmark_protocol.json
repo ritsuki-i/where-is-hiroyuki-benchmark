@@ -1,5 +1,5 @@
 {
-  "protocol_id": "face-search-v1",
+  "protocol_id": "face-search-v2",
   "task": "Locate the face in the scene that matches the reference character.",
   "prompt": "Find the person in the scene whose face matches the reference character. Their clothes and pose may differ. Return a tight bounding box around only the visible face in the scene, not the body or reference image.",
   "scoring": "The predicted face box center must lie inside the approximate ground-truth face box. No box is incorrect; errors and unsupported models are not scored.",
@@ -7,10 +7,10 @@
   "direct_image_preprocessing": {"max_side": 1568, "jpeg_quality": 90},
   "models": {
     "Jev": {"version": "jev-1.14.0", "method": "direct Box API", "prompt_suffix": "The scene is `scene` and the reference image is `reference`.", "image_preprocessing": "RGB JPEG quality 90, longest side at most 1568 pixels", "max_request_seconds": 90},
-    "Clef": {"version": "@cf/cloudflare/clef", "method": "direct Box API", "status": "unsupported: Box question type unavailable; no YuNet fallback"},
+    "Clef": {"version": "@cf/cloudflare/clef", "method": "direct image input; choose left, top, right and bottom independently using four Choice questions in one request; no detector or other model", "state": "The first image is the reference character. The second image is the scene.", "coordinate_fields": {"left": "leftmost x coordinate", "top": "topmost y coordinate", "right": "rightmost x coordinate", "bottom": "bottommost y coordinate"}, "question_template": "{task} Choose the {description} of the face box as a percentage of the scene image width for x or height for y. The origin is the top-left corner.", "coordinate_step": 0.01, "coordinate_options": 101, "choice_id_format": "p000 through p100", "choice_description_format": "0 percent through 100 percent", "invalid_box": "record no box and incorrect; do not reorder or repair coordinates", "image_preprocessing": "same RGB JPEG quality 90 and longest-side limit 1568 as Jev", "max_request_seconds": 90},
     "Opus": {"version": "claude-opus-5-5", "method": "Claude Code with Read tool for the two input files only", "system_prompt": "Use the Read tool only for the two provided images. Do not use other tools or files. Follow the user's image task and return only the requested JSON.", "prompt_prefix": "Read these two images using the Read tool: reference image and scene image, prepared in an isolated temporary workspace.", "prompt_suffix": "Use normalized 0 to 1 coordinates in JSON only: {\"box\": [left, top, right, bottom]}. Do not use any other files or tools.", "cli_flags": ["--safe-mode", "--restricted", "--strict-mcp-config", "--tools Read", "--allowedTools Read", "--permission-mode dontAsk", "--output-format json", "--system-prompt (fixed above)"], "image_preprocessing": "same RGB JPEG quality 90 and longest-side limit 1568 as Jev, via Read tool", "max_request_seconds": 180},
     "YuNet + SFace": {"method": "local YuNet face detection followed by SFace reference similarity; highest-scoring detected face", "weights": ["models/yunet.onnx", "models/sface.onnx"], "backend": "OpenCV default", "detection_score_threshold": 0.6, "nms_threshold": 0.3, "top_k": 5000, "reference_face": "largest detected face"}
   },
   "randomness": "Provider and CLI defaults; no fixed random seed is set.",
-  "note": "Provider interfaces, image preprocessing, prompt wrappers, and outputs differ; Jev and Opus receive identical prepared JPEGs but use different APIs. The executable code and file hashes are recorded for each run."
+  "note": "Jev, Clef, and Opus receive identical prepared JPEGs and the same core task, but use different output interfaces. Clef returns discrete coordinates rather than a native Box; none of these methods outputs a segmentation mask. The executable code and file hashes are recorded for each run."
 }

@@ -209,9 +209,60 @@ def run_clef_candidates(index):
             'usage':result.get('usage')}
 
 def run_clef(index):
-    # Workers AI Clef does not accept Jev's Box question type. Do not silently
-    # substitute YuNet or a different localization protocol in the live race.
-    raise RuntimeError('ClefはJevと同じBox形式をサポートしていないため、同条件では実行できません')
+    """Use Clef alone to choose four discrete box coordinates in one request."""
+    token = read_setting('CLOUDFLARE_API_TOKEN')
+    account = read_setting('CLOUDFLARE_ACCOUNT_ID')
+    if not token or not account:
+        raise RuntimeError('CLOUDFLARE_API_TOKEN または CLOUDFLARE_ACCOUNT_ID が設定されていません')
+    if not re.fullmatch(r'[0-9a-fA-F]{32}',account):
+        raise RuntimeError('CloudflareアカウントIDの形式が不正です')
+    stage = STAGES[index]
+    start = time.perf_counter()
+    ref = asset(REFERENCE)
+    scene = asset(ROOT/'data/stages_v3'/stage['image'])
+    options = {f'p{i:03d}':f'{i} percent' for i in range(PROTOCOL['models']['Clef']['coordinate_options'])}
+    fields = PROTOCOL['models']['Clef']['coordinate_fields']
+    questions = {name:{'type':'choice',
+                       'instructions':PROTOCOL['models']['Clef']['question_template'].format(task=PROTOCOL['prompt'],description=description),
+                       'criteria':options} for name,description in fields.items()}
+    body = {'model':'clef',
+            'images':['data:image/jpeg;base64,'+ref['data_base64'],'data:image/jpeg;base64,'+scene['data_base64']],
+            'state':PROTOCOL['models']['Clef']['state'],
+            'questions':questions}
+    url=f'https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef'
+    request=urllib.request.Request(url,data=json.dumps(body).encode('utf-8'),method='POST',
+                                   headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+    try:
+        with urllib.request.urlopen(request,timeout=PROTOCOL['models']['Clef']['max_request_seconds']) as response:
+            payload=json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f'Cloudflare Clef API HTTP {exc.code}') from None
+    if not isinstance(payload,dict) or not payload.get('success') or not isinstance(payload.get('result'),dict):
+        raise RuntimeError('Cloudflare Clef APIがエラーを返しました')
+    result=payload['result']
+    if result.get('model') not in ('clef','@cf/cloudflare/clef'):
+        raise RuntimeError('Clefの応答モデルを確認できません')
+    answers=result.get('answers',{})
+    selected={}
+    axis_confidence={}
+    for name in fields:
+        answer=answers.get(name,{})
+        choice=answer.get('choice') if isinstance(answer,dict) else None
+        if choice not in options:
+            raise RuntimeError('Clefの座標応答を解釈できません')
+        selected[name]=choice
+        value=answer.get('confidence')
+        axis_confidence[name]=value if not isinstance(value,bool) and isinstance(value,(int,float)) and math.isfinite(value) and 0<=value<=1 else None
+    coords=[int(selected[name][1:])*PROTOCOL['models']['Clef']['coordinate_step'] for name in fields]
+    valid=coords[0]<coords[2] and coords[1]<coords[3]
+    box=coords if valid else None
+    prepared={'reference':hashlib.sha256(base64.b64decode(ref['data_base64'])).hexdigest(),
+              'scene':hashlib.sha256(base64.b64decode(scene['data_base64'])).hexdigest()}
+    return {'box':box,'confidence':None,**score_box(box,stage),'model':'@cf/cloudflare/clef',
+            'seconds':time.perf_counter()-start,'prompt':PROTOCOL['prompt'],'prepared_sha256':prepared,
+            'coordinate_questions':{name:question['instructions'] for name,question in questions.items()},
+            'coordinate_choices':selected,'axis_confidence':axis_confidence,
+            'invalid_coordinates':not valid,'usage':result.get('usage')}
 
 def run_claude(index, model_id):
     cli = shutil.which('claude.cmd') or shutil.which('claude')

@@ -1,11 +1,11 @@
 # ステージ1：4手法の推論結果
 
-左上からJev、Clef単体、Claude Opus 5.5、YuNet + SFace。赤が予測枠、黄色が概算の正解顔枠です。Clefは同じBox形式に対応せず未測定です。
+左上からJev、Clef単体、Claude Opus 5.5、YuNet + SFace。赤が予測枠、黄色が概算の正解顔枠です。この過去の試行ではClefはBox形式非対応のため未測定でした。
 
 ![ステージ1の4手法の予測と正解](media/comparison-stage1.jpg)
 
 - Jev 1.14.0：不正解（1.97秒）
-- Clef：未測定（Box形式非対応）
+- Clef：当時は未測定（Box形式非対応）
 - Claude Opus 5.5：正解（9.25秒）
 - YuNet + SFace：正解（1.13秒）
 

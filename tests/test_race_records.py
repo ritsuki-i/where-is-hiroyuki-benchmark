@@ -33,7 +33,7 @@ class RaceRecordTests(unittest.TestCase):
                          'correct':True,'model':'test','stage_wall_seconds':0.5})
         self.payload={'run_id':'a'*32,'sha256':{'file':'expected'},'models':[
             {'name':'Jev','status':'completed','elapsed_text':'3.28','stages':copy.deepcopy(rows)},
-            {'name':'Clef','status':'unsupported','elapsed_text':None,'stages':[]},
+            {'name':'Clef','status':'skipped','elapsed_text':None,'stages':[]},
             {'name':'Opus 5.5','status':'completed','elapsed_text':'43.20','stages':copy.deepcopy(rows)},
             {'name':'YuNet + SFace','status':'completed','elapsed_text':'11.10','stages':copy.deepcopy(rows)}]}
         for model,version in ((self.payload['models'][0],'jev-1.14.0'),
@@ -58,7 +58,7 @@ class RaceRecordTests(unittest.TestCase):
         record=json.loads((self.root/result['result_file']).read_text(encoding='utf-8'))
         readme=(self.root/'README.md').read_text(encoding='utf-8')
         self.assertIn('| Jev | 5 / 5 | 3.28秒 | 完了 |',readme)
-        self.assertIn('| Clef | — | — | Box非対応 |',readme)
+        self.assertIn('| Clef | — | — | 未実行 |',readme)
         self.assertEqual(record['models'][2]['elapsed_text'],'43.20')
         for i in range(1,6):
             self.assertTrue((self.root/'docs/runs'/self.payload['run_id']/f'stage{i}.jpg').exists())
@@ -76,6 +76,28 @@ class RaceRecordTests(unittest.TestCase):
         bad=copy.deepcopy(self.payload)
         bad['models'][2]['stages'][0]['prepared_sha256']['scene']='d'*64
         with self.assertRaises(ValueError): self.save(bad)
+
+    def test_clef_coordinate_choices_are_saved_without_repair(self):
+        payload=copy.deepcopy(self.payload)
+        fields=server.PROTOCOL['models']['Clef']['coordinate_fields']
+        questions={name:server.PROTOCOL['models']['Clef']['question_template'].format(task=server.PROTOCOL['prompt'],description=description) for name,description in fields.items()}
+        rows=[]
+        for i,stage in enumerate(server.STAGES):
+            choices={'left':'p010','top':'p020','right':'p030','bottom':'p040'}
+            box=[int(choices[name][1:])*0.01 for name in ('left','top','right','bottom')]
+            rows.append({'stage':i+1,'box':box,'correct':server.score_box(box,stage)['correct'],
+                         'model':'@cf/cloudflare/clef','stage_wall_seconds':0.5,
+                         'prompt':server.PROTOCOL['prompt'],'prepared_sha256':{'reference':'b'*64,'scene':'c'*64},
+                         'coordinate_choices':choices,'coordinate_questions':questions,'invalid_coordinates':False})
+        rows[0].update(box=None,correct=False,invalid_coordinates=True,
+                       coordinate_choices={'left':'p010','top':'p020','right':'p030','bottom':'p020'})
+        payload['models'][1]={'name':'Clef','status':'completed','elapsed_text':'12.82','stages':rows}
+        result=self.save(payload)
+        record=json.loads((self.root/result['result_file']).read_text(encoding='utf-8'))
+        self.assertIsNone(record['models'][1]['stages'][0]['box'])
+        self.assertTrue(record['models'][1]['stages'][0]['invalid_coordinates'])
+        self.assertEqual(record['models'][1]['stages'][0]['coordinate_choices']['bottom'],'p020')
+        self.assertIn('12.82秒',(self.root/'README.md').read_text(encoding='utf-8'))
 
     def test_rejects_changed_configuration(self):
         bad=copy.deepcopy(self.payload)

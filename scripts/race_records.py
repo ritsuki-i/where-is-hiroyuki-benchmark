@@ -75,8 +75,6 @@ def validate(payload, stages, score_box, protocol):
         status = item.get('status')
         if status not in ('completed','error','skipped','unsupported'):
             raise ValueError('invalid model status')
-        if expected == 'Clef' and status != 'unsupported':
-            raise ValueError('Clef Box is unsupported by this protocol')
         elapsed = item.get('elapsed_text')
         if status in ('completed','error'):
             if not isinstance(elapsed,str) or not re.fullmatch(r'\d{1,6}\.\d{2}',elapsed):
@@ -108,21 +106,39 @@ def validate(payload, stages, score_box, protocol):
             score = score_box(box,stages[i])
             if row.get('correct') is not score['correct']:
                 raise ValueError('score differs from protocol')
-            expected_version={'Jev':'jev-1.14.0','Opus 5.5':'claude-opus-5-5','YuNet + SFace':'YuNet + SFace'}.get(expected)
+            expected_version={'Jev':'jev-1.14.0','Clef':'@cf/cloudflare/clef','Opus 5.5':'claude-opus-5-5','YuNet + SFace':'YuNet + SFace'}.get(expected)
             if row.get('model') != expected_version:
                 raise ValueError('response model differs from protocol')
             prepared = row.get('prepared_sha256')
             prompt = row.get('prompt')
-            if expected in ('Jev','Opus 5.5'):
+            if expected in ('Jev','Clef','Opus 5.5'):
                 if not isinstance(prompt,str) or len(prompt)>5000 or not isinstance(prepared,dict) or set(prepared)!={'reference','scene'} or any(not isinstance(value,str) or not re.fullmatch(r'[0-9a-f]{64}',value) for value in prepared.values()):
                     raise ValueError('missing direct-model prompt or image hashes')
                 if expected == 'Jev' and prompt != protocol['prompt']+' '+protocol['models']['Jev']['prompt_suffix']:
                     raise ValueError('Jev prompt differs from protocol')
+                if expected == 'Clef' and prompt != protocol['prompt']:
+                    raise ValueError('Clef prompt differs from protocol')
                 if expected == 'Opus 5.5' and (protocol['prompt'] not in prompt or not prompt.endswith(protocol['models']['Opus']['prompt_suffix'])):
                     raise ValueError('Opus prompt differs from protocol')
+            choices=row.get('coordinate_choices')
+            invalid=row.get('invalid_coordinates')
+            if expected == 'Clef':
+                fields=('left','top','right','bottom')
+                if not isinstance(choices,dict) or set(choices)!=set(fields) or any(not isinstance(choices[name],str) or not re.fullmatch(r'p(?:0[0-9]{2}|100)',choices[name]) for name in fields):
+                    raise ValueError('invalid Clef coordinate choices')
+                coords=[int(choices[name][1:])*protocol['models']['Clef']['coordinate_step'] for name in fields]
+                is_invalid=coords[0]>=coords[2] or coords[1]>=coords[3]
+                if invalid is not is_invalid or box != (None if is_invalid else coords):
+                    raise ValueError('Clef box differs from chosen coordinates')
+                spec=protocol['models']['Clef']
+                expected_questions={name:spec['question_template'].format(task=protocol['prompt'],description=spec['coordinate_fields'][name]) for name in fields}
+                if row.get('coordinate_questions') != expected_questions:
+                    raise ValueError('Clef questions differ from protocol')
             checked.append({'stage':i+1,'box':box,**score,'stage_wall_seconds':stage_seconds,
                             'backend_seconds':row.get('seconds'),'candidates':row.get('candidates'),
                             'prompt':prompt,'prepared_sha256':prepared,
+                            'coordinate_choices':choices,'coordinate_questions':row.get('coordinate_questions'),'axis_confidence':row.get('axis_confidence'),
+                            'invalid_coordinates':invalid,'usage':row.get('usage'),
                             'confidence':row.get('confidence'),
                             'model':str(row.get('model',''))[:100]})
         if status=='error' and (not checked or 'error' not in checked[-1]):
@@ -130,9 +146,10 @@ def validate(payload, stages, score_box, protocol):
         clean.append({'name':expected,'status':status,'elapsed_text':elapsed,
                       'successes':sum(bool(r.get('correct')) for r in checked),
                       'completed_stages':sum('error' not in r for r in checked),'stages':checked})
-    jev, opus = clean[0]['stages'], clean[2]['stages']
-    for left,right in zip(jev,opus):
-        if 'error' not in left and 'error' not in right and left['prepared_sha256'] != right['prepared_sha256']:
+    for i in range(len(stages)):
+        prepared=[model['stages'][i]['prepared_sha256'] for model in clean[:3]
+                  if i<len(model['stages']) and 'error' not in model['stages'][i]]
+        if prepared and any(value!=prepared[0] for value in prepared[1:]):
             raise ValueError('direct-model prepared images differ')
     return run_id,clean
 
@@ -151,9 +168,9 @@ def save(payload, reference, stages, score_box):
     source = readme.read_text(encoding='utf-8')
     if source.count(START)!=1 or source.count(END)!=1 or source.index(START)>source.index(END):
         raise RuntimeError('READMEの結果欄を更新できません')
-    lines = [f'実行ID：`{run_id}`  ',f"保存日時：{record['recorded_at']}", '',
+    lines = [f'実行ID：`{run_id}`', '',f"実行条件：`{current['protocol']['protocol_id']}`", '',f"保存日時：{record['recorded_at']}", '',
              '| 手法 | 正解 | 画面の時間 | 状態 |','|---|---:|---:|---|']
-    labels={'completed':'完了','error':'エラーで中断','skipped':'未実行','unsupported':'Box非対応'}
+    labels={'completed':'完了','error':'エラーで中断','skipped':'未実行','unsupported':'未対応'}
     for item in models:
         score = f"{item['successes']} / 5" if item['status']=='completed' else (f"{item['successes']} / 5（未完了）" if item['status']=='error' else '—')
         elapsed = item['elapsed_text']+'秒' if item['elapsed_text'] is not None else '—'
@@ -164,7 +181,7 @@ def save(payload, reference, stages, score_box):
     render_run(run_dir,run_id,models,stages)
     lines += ['',f'[この実行のステージ別予測画像](docs/runs/{run_id}/index.md)', '',
               f'実行時の設定・画像・コードのSHA-256、予測枠と各ステージの結果はローカルの `results/race_{run_id}.json` に保存しています。',
-              '画面に表示した時間と正解数を記録しています。ClefはBox形式に非対応のため未採点です。']
+              '画面に表示した時間と正解数を記録しています。Clefは単体で4座標を選択し、不正な座標は補正せず不正解としています。']
     updated=source[:source.index(START)]+START+'\n'+'\n'.join(lines)+'\n'+source[source.index(END):]
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
@@ -208,9 +225,9 @@ def render_run(directory,run_id,models,stages):
                     pen.rectangle(coords,outline=color,width=5)
             panel.thumbnail((panel_width,panel_height),Image.Resampling.LANCZOS)
             canvas.paste(panel,(x,y+header))
-            status='MATCH' if row['correct'] else ('MISS: no box' if row['box'] is None else 'MISS')
+            status='MATCH' if row['correct'] else ('MISS: invalid box' if row.get('invalid_coordinates') else 'MISS: no box' if row['box'] is None else 'MISS')
             draw.text((x+10,y+8),f"{model['name']} | {status}",font=font,fill='#171717')
-            notes.append(f"- {model['name']}：{'正解' if row['correct'] else '不正解'}")
+            notes.append(f"- {model['name']}：{'正解' if row['correct'] else '不正解（座標が不正・未補正）' if row.get('invalid_coordinates') else '不正解'}")
         canvas.save(directory/f'stage{i+1}.jpg',quality=90)
         page=[f'# ステージ{i+1}','',f'実行ID：`{run_id}`','',
               f'![この実行のステージ{i+1}の予測](stage{i+1}.jpg)','',*notes,'',

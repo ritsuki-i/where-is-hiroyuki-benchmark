@@ -49,9 +49,9 @@ def main():
             draw.text((x+12,y+8),f'{name}  |  {status}  |  {row["wall_seconds"]:.2f} s',font=font,fill='#171717')
             canvas.paste(panel,(x,y+title_height))
         canvas.save(OUT/f'comparison-stage{i+1}.jpg',quality=91)
-        notes = [f'- {name}：未測定（Box形式非対応）' if row is None else f'- {name}：{"正解" if row["correct"] else "不正解"}（{row["wall_seconds"]:.2f}秒）' for name,row in rows]
+        notes = [f'- {name}：当時は未測定（Box形式非対応）' if row is None else f'- {name}：{"正解" if row["correct"] else "不正解"}（{row["wall_seconds"]:.2f}秒）' for name,row in rows]
         page = [f'# ステージ{i+1}：4手法の推論結果','',
-                '左上からJev、Clef単体、Claude Opus 5.5、YuNet + SFace。赤が予測枠、黄色が概算の正解顔枠です。Clefは同じBox形式に対応せず未測定です。','',
+                '左上からJev、Clef単体、Claude Opus 5.5、YuNet + SFace。赤が予測枠、黄色が概算の正解顔枠です。この過去の試行ではClefはBox形式非対応のため未測定でした。','',
                 f'![ステージ{i+1}の4手法の予測と正解](media/comparison-stage{i+1}.jpg)','',*notes,'',
                 '正解は予測枠の中心が概算の正解顔枠に入るかで判定しています。Jev・Opus・SFaceは11月5日の測定で、時間には準備・通信・起動を含みます。YuNet + Clefは別の補助実験です。','',
                 'このページのJevは顔枠を指示した過去の保存済み実験結果です。最新のレース結果とは異なる実行です。','',
