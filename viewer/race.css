@@ -1,2 +1,54 @@
-﻿:root{font-family:system-ui,"Noto Sans JP",sans-serif;color:#202620;background:#f4f3eb}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}main{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:6px;padding:8px}.header{display:flex;align-items:center;gap:16px;min-width:0;padding:2px 5px}.brand{min-width:0}.eyebrow{font:9px monospace;color:#748074;letter-spacing:.1em}h1{font-size:clamp(18px,2vw,28px);line-height:1.05;letter-spacing:-.05em;margin:3px 0}h1 span{color:#e65432}.reference{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:11px;font-weight:700}.reference img{height:40px;width:28px;object-fit:cover;object-position:top;border-radius:4px}.reference small{font-size:9px;color:#7c887b;font-weight:400}.header-actions{display:flex;align-items:center;gap:10px}#race-status{font:10px monospace;color:#de6546;white-space:nowrap}button{font:inherit;cursor:pointer}#start{border:0;border-radius:6px;padding:10px 15px;background:#243f31;color:white;font-weight:700;font-size:12px;white-space:nowrap}#start:disabled{opacity:.5;cursor:wait}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:7px;min-height:0}.card{min-height:0;min-width:0;background:#fffef9;border:1px solid #dce1d7;border-radius:8px;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr) auto}.cardhead{padding:6px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}.model{display:flex;align-items:center;gap:7px}.icon{width:23px;height:23px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:800;color:white;background:var(--accent)}.name{font-size:13px;font-weight:800}.badge{font:9px monospace;padding:3px 5px;border-radius:4px;background:#eff2ea;color:#718171}.badge.live{background:#e9f3e5;color:#468148}.state{font-size:11px;color:#79877a;white-space:nowrap}.frame{position:relative;min-height:0;background:#e6e9df;overflow:hidden}.frame img{width:100%;height:100%;object-fit:contain;display:block}.box{position:absolute;border:2px solid #f05228;box-shadow:0 0 0 1px #fff;display:none;pointer-events:none}.box.show{display:block}.frame-label{position:absolute;top:6px;left:6px;background:#1e2b23df;color:#fff;padding:4px 6px;border-radius:3px;font:10px monospace}.scan{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,#dcf75a55 50%,transparent 55%);background-size:100% 200%;animation:scan 2s linear infinite;display:none;pointer-events:none}.running .scan{display:block}@keyframes scan{to{background-position:0 -200%}}.cardfoot{padding:5px 9px;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:42px}.review{display:flex;align-items:center;gap:4px;min-width:0}.review-label{font-size:10px;color:#7c887c;white-space:nowrap}.stages{display:flex;gap:3px}.stage-btn{width:26px;height:26px;border:1px solid #d5ddd1;border-radius:4px;background:#f1f3ed;color:#657166;font-size:11px;padding:0}.stage-btn:disabled{opacity:.38;cursor:default}.stage-btn.ok{background:#e2f0df;color:#3c7144;border-color:#a8c7a6}.stage-btn.ng{background:#fae7df;color:#a63b29;border-color:#e4b4a5}.stage-btn.err{background:#e7e7e4;color:#6e706d}.stage-btn.selected{outline:2px solid #253d2f;outline-offset:1px}.stats{display:flex;align-items:baseline;gap:8px;white-space:nowrap}.time{font:16px monospace}.score{font-size:11px;color:#708073}.score strong{color:#2b4936}footer{font-size:10px;color:#879386;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:600px){.reference span,.eyebrow,#race-status,.review-label{display:none}.header{gap:6px}.reference{margin-left:auto}.header-actions{gap:3px}.cardhead{padding:4px 6px}.cardfoot{padding:3px 5px;gap:3px}.stage-btn{width:21px;height:22px;font-size:10px}.stages{gap:2px}.time{font-size:12px}.score{font-size:10px}.state{font-size:10px}footer{font-size:9px}}
-.target-box{border:2px dashed #ffd42a;box-shadow:0 0 0 1px #403608}.confidence-label{position:absolute;right:6px;top:6px;background:#1e2b23e8;color:#fff;padding:4px 6px;border-radius:3px;font-size:10px}.state{overflow:hidden;text-overflow:ellipsis;text-align:right}
+:root{font-family:system-ui,"Noto Sans JP",sans-serif;color:#202620;background:#f4f3eb}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+main{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:7px;padding:10px}
+.header{display:flex;align-items:center;gap:clamp(10px,1.4vw,24px);min-width:0;padding:2px 6px}
+.brand{min-width:0;flex:1}
+.eyebrow{font:10px monospace;color:#748074;letter-spacing:.1em}
+h1{font-size:clamp(21px,2.2vw,34px);line-height:1.05;letter-spacing:-.05em;margin:4px 0;white-space:nowrap}
+h1 span{color:#e65432}
+.reference{display:flex;align-items:center;gap:10px;flex-shrink:0;padding:5px 12px 5px 5px;background:#fffef9;border:1px solid #dce1d7;border-radius:10px;font-size:clamp(13px,1.1vw,18px);font-weight:800;line-height:1.35}
+.reference img{height:clamp(82px,10vh,120px);width:clamp(82px,10vh,120px);object-fit:cover;object-position:center top;border-radius:7px;background:#f5f2e9}
+.reference small{font-size:clamp(10px,.8vw,13px);color:#657366;font-weight:500}
+.header-actions{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 10px;font-size:11px}
+.header-actions label{white-space:nowrap}
+#race-status{font:10px monospace;color:#de6546;white-space:nowrap}
+button{font:inherit;cursor:pointer}
+#start{grid-column:2;grid-row:1 / span 3;border:0;border-radius:7px;padding:13px 17px;background:#243f31;color:white;font-weight:700;font-size:14px;white-space:nowrap}
+#start:disabled{opacity:.5;cursor:wait}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;min-height:0}
+.card{min-height:0;min-width:0;background:#fffef9;border:1px solid #dce1d7;border-radius:9px;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.cardhead{padding:7px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.model{display:flex;align-items:center;gap:9px;min-width:0}
+.icon{width:clamp(29px,3vh,38px);height:clamp(29px,3vh,38px);flex:none;border-radius:7px;display:grid;place-items:center;font-size:13px;font-weight:800;color:white;background:var(--accent)}
+.name{font-size:clamp(20px,2vw,32px);font-weight:850;line-height:1.1;letter-spacing:-.025em;white-space:nowrap}
+.badge{flex:none;font:10px monospace;padding:4px 6px;border-radius:4px;background:#eff2ea;color:#718171}
+.badge.live{background:#e9f3e5;color:#468148}
+.state{font-size:11px;color:#79877a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;min-width:0}
+.frame{position:relative;min-height:0;background:#e6e9df;overflow:hidden}
+.frame img{width:100%;height:100%;object-fit:contain;display:block}
+.box{position:absolute;border:2px solid #f05228;box-shadow:0 0 0 1px #fff;display:none;pointer-events:none}
+.box.show{display:block}
+.target-box{border:2px dashed #ffd42a;box-shadow:0 0 0 1px #403608}
+.frame-label{position:absolute;top:6px;left:6px;background:#1e2b23df;color:#fff;padding:4px 6px;border-radius:3px;font:10px monospace}
+.confidence-label{position:absolute;right:6px;top:6px;background:#1e2b23e8;color:#fff;padding:4px 6px;border-radius:3px;font-size:10px}
+.scan{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,#dcf75a55 50%,transparent 55%);background-size:100% 200%;animation:scan 2s linear infinite;display:none;pointer-events:none}
+.running .scan{display:block}
+@keyframes scan{to{background-position:0 -200%}}
+.cardfoot{padding:5px 9px;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:42px}
+.review{display:flex;align-items:center;gap:4px;min-width:0}
+.review-label{font-size:10px;color:#7c887c;white-space:nowrap}
+.stages{display:flex;gap:3px}
+.stage-btn{width:26px;height:26px;border:1px solid #d5ddd1;border-radius:4px;background:#f1f3ed;color:#657166;font-size:11px;padding:0}
+.stage-btn:disabled{opacity:.38;cursor:default}
+.stage-btn.ok{background:#e2f0df;color:#3c7144;border-color:#a8c7a6}
+.stage-btn.ng{background:#fae7df;color:#a63b29;border-color:#e4b4a5}
+.stage-btn.err{background:#e7e7e4;color:#6e706d}
+.stage-btn.selected{outline:2px solid #253d2f;outline-offset:1px}
+.stats{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.time{font:16px monospace}
+.score{font-size:11px;color:#708073}
+.score strong{color:#2b4936}
+footer{font-size:10px;color:#879386;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1050px){.header{gap:8px}.reference small{display:none}.header-actions{font-size:10px;gap:3px 6px}#start{padding:10px}.badge{font-size:9px}.state{max-width:35%}}
+@media(max-width:700px){main{padding:5px;gap:4px}.header{flex-wrap:wrap;gap:5px}.brand{flex:1}.eyebrow,#race-status,.review-label{display:none}h1{font-size:20px}.reference{padding:3px 6px 3px 3px;font-size:11px;gap:4px}.reference img{height:62px;width:62px}.header-actions{width:100%;grid-template-columns:1fr 1fr auto;font-size:9px}.header-actions label{white-space:normal;line-height:1.25}#start{grid-column:3;grid-row:1;padding:8px;font-size:11px}.cardhead{padding:4px 6px}.model{gap:4px}.icon{width:24px;height:24px;font-size:10px}.name{font-size:clamp(14px,3vw,20px)}.badge{display:none}.cardfoot{padding:3px 5px;gap:3px}.stage-btn{width:21px;height:22px;font-size:10px}.stages{gap:2px}.time{font-size:12px}.score{font-size:10px}.state{font-size:9px;max-width:32%}footer{font-size:9px}}
