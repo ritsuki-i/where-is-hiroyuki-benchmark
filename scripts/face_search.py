@@ -1,17 +1,24 @@
 """Local face detection and reference matching using OpenCV YuNet and SFace."""
 from pathlib import Path
+import json
 import time
 
 import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+FACE_CONFIG = json.loads((ROOT/'benchmark_protocol.json').read_text(encoding='utf-8'))['models']['YuNet + SFace']
+
+def create_detector(path):
+    return cv2.FaceDetectorYN.create(str(path), '', (320, 320),
+                                    FACE_CONFIG['detection_score_threshold'],
+                                    FACE_CONFIG['nms_threshold'],FACE_CONFIG['top_k'])
 
 def detect_faces(image_path):
     detector_path = ROOT / 'models/yunet.onnx'
     if not detector_path.exists():
         raise RuntimeError('YuNetモデルがありません。READMEの準備手順を確認してください')
-    detector = cv2.FaceDetectorYN.create(str(detector_path), '', (320, 320), 0.6, 0.3, 5000)
+    detector = create_detector(detector_path)
     image = cv2.imdecode(np.fromfile(str(image_path), dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
         raise RuntimeError('画像を読み込めません')
@@ -26,7 +33,7 @@ def search(image_path, reference_path):
     recognizer_path = ROOT / 'models/sface.onnx'
     if not detector_path.exists() or not recognizer_path.exists():
         raise RuntimeError('顔モデルがありません。READMEの準備手順を確認してください')
-    detector = cv2.FaceDetectorYN.create(str(detector_path), '', (320, 320), 0.6, 0.3, 5000)
+    detector = create_detector(detector_path)
     recognizer = cv2.FaceRecognizerSF.create(str(recognizer_path), '')
 
     def detect(path):

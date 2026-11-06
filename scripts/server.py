@@ -1,5 +1,6 @@
 """Local race viewer and server-side Jev proxy. Never exposes credentials."""
 import base64
+import hashlib
 import io
 import json
 import math
@@ -11,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from PIL import Image
@@ -18,7 +20,21 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 STAGES = json.loads((ROOT/'data/stages_v3/annotations_draft.json').read_text(encoding='utf-8'))['stages']
 REFERENCE = next((ROOT/'hiroyuki').glob('*.png'))
-MODEL = 'jev-1.14.0'
+PROTOCOL = json.loads((ROOT/'benchmark_protocol.json').read_text(encoding='utf-8'))
+MODEL = PROTOCOL['models']['Jev']['version']
+PORT = int(os.environ.get('RACE_PORT','8765'))
+if not 1024 <= PORT <= 65535:
+    raise ValueError('RACE_PORT must be between 1024 and 65535')
+LOADED_HASHES = {str(path.relative_to(ROOT)).replace('\\','/'):hashlib.sha256(path.read_bytes()).hexdigest()
+                 for path in (Path(__file__),ROOT/'benchmark_protocol.json',ROOT/'data/stages_v3/annotations_draft.json',
+                              ROOT/'scripts/face_search.py',ROOT/'scripts/race_records.py')}
+
+def run_snapshot():
+    from race_records import snapshot
+    result = snapshot(REFERENCE,STAGES)
+    if any(result['sha256'].get(name) != value for name,value in LOADED_HASHES.items()):
+        raise RuntimeError('サーバー起動後にコードや設定が変更されました。サーバーを再起動してください')
+    return result
 
 def read_key():
     if os.environ.get('TYPESAFE_API_KEY'):
@@ -49,9 +65,10 @@ def asset(path):
     return image_asset(im)
 
 def image_asset(im):
-    im.thumbnail((1568,1568), Image.Resampling.LANCZOS)
+    max_side=PROTOCOL['direct_image_preprocessing']['max_side']
+    im.thumbnail((max_side,max_side), Image.Resampling.LANCZOS)
     out = io.BytesIO()
-    im.save(out, format='JPEG', quality=90)
+    im.save(out, format='JPEG', quality=PROTOCOL['direct_image_preprocessing']['jpeg_quality'])
     return {'type':'image','format':'jpg','data_base64':base64.b64encode(out.getvalue()).decode('ascii')}
 
 def score_box(coords, stage, target_kind='face'):
@@ -79,15 +96,17 @@ def run_jev(index):
     target_ref='target-'+uuid.uuid4().hex
     body={'model':MODEL,'state':{'scene':scene_ref,'reference':target_ref},
           'assets':{scene_ref:asset(ROOT/'data/stages_v3'/stage['image']),target_ref:asset(REFERENCE)},
-          'questions':{'target':{'type':'box','instructions':'Locate in `scene` the person whose face matches the character in `reference`. His clothes and pose may differ; return the visible person, not the reference image.'}}}
+          'questions':{'target':{'type':'box','instructions':PROTOCOL['prompt']+' The scene is `scene` and the reference image is `reference`.'}}}
     req=urllib.request.Request('https://api.typesafe.ai/v1/systemone', data=json.dumps(body).encode(), method='POST', headers={'Authorization':'Bearer '+key,'Content-Type':'application/json','TypeSafe-Danger-Zone-Images':'true'})
     start=time.perf_counter()
     try:
-        with urllib.request.urlopen(req,timeout=90) as response: payload=json.load(response)
+        with urllib.request.urlopen(req,timeout=PROTOCOL['models']['Jev']['max_request_seconds']) as response: payload=json.load(response)
     except urllib.error.HTTPError as e:
         # Do not return raw upstream bodies; they can contain request details.
         raise RuntimeError(f'Jev API HTTP {e.code}') from e
     elapsed=time.perf_counter()-start
+    if payload.get('model') != MODEL:
+        raise RuntimeError('Jevの応答モデルが指定したバージョンと一致しません')
     answer=payload.get('answers',{}).get('target',{})
     box=answer.get('box',{})
     try:
@@ -97,7 +116,10 @@ def run_jev(index):
     confidence=answer.get('confidence')
     if isinstance(confidence,bool) or not isinstance(confidence,(int,float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
         confidence=None
-    return {'box':coords,'confidence':confidence,**score_box(coords,stage,'person'),'seconds':elapsed,'model':payload.get('model',MODEL)}
+    prepared_hashes={name:hashlib.sha256(base64.b64decode(body['assets'][ref]['data_base64'])).hexdigest()
+                     for name,ref in (('reference',target_ref),('scene',scene_ref))}
+    return {'box':coords,'confidence':confidence,**score_box(coords,stage),'seconds':elapsed,'model':payload['model'],
+            'prompt':body['questions']['target']['instructions'],'prepared_sha256':prepared_hashes}
 
 def run_face(index):
     from face_search import search
@@ -204,13 +226,22 @@ def run_claude(index, model_id):
         if not status.get('loggedIn') or status.get('authMethod') != 'claude.ai' or not status.get('subscriptionType'):
             raise RuntimeError('Claudeのサブスク認証を確認できません')
         stage = STAGES[index]
-        scene = (ROOT/'data/stages_v3'/stage['image']).resolve()
-        prompt = (f'Read these two images using the Read tool: reference image "{REFERENCE.resolve()}" and scene image "{scene}". '
-                  'Find the person in the scene whose face matches the reference; their clothes and pose may differ. '
-                  'Give a tight bounding box around only the visible face of that person in the SCENE, not the body, as normalized 0 to 1 coordinates '
-                  'in JSON only: {"box": [left, top, right, bottom]}. Do not use any other files or tools.')
+        scene = ROOT/'data/stages_v3'/stage['image']
         started = time.perf_counter()
-        proc = subprocess.run([cli, '-p', prompt, '--model', model_id, '--safe-mode', '--restricted', '--strict-mcp-config', '--tools', 'Read', '--allowedTools', 'Read', '--permission-mode', 'dontAsk', '--output-format', 'json'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180, env=env, cwd=ROOT)
+        # Claude's restricted workspace contains only the two input images;
+        # annotation files and other project material cannot be read.
+        with tempfile.TemporaryDirectory(prefix='face-race-') as workdir:
+            reference_copy = Path(workdir)/'reference.jpg'
+            scene_copy = Path(workdir)/'scene.jpg'
+            # Match the exact JPEG conversion used for Jev, not a second resize.
+            reference_copy.write_bytes(base64.b64decode(asset(REFERENCE)['data_base64']))
+            scene_copy.write_bytes(base64.b64decode(asset(scene)['data_base64']))
+            prompt = (f'Read these two images using the Read tool: reference image "{reference_copy}" and scene image "{scene_copy}". '
+                      + PROTOCOL['prompt'] + ' Use normalized 0 to 1 coordinates in JSON only: '
+                      '{"box": [left, top, right, bottom]}. Do not use any other files or tools.')
+            prepared_hashes={'reference':hashlib.sha256(reference_copy.read_bytes()).hexdigest(),
+                             'scene':hashlib.sha256(scene_copy.read_bytes()).hexdigest()}
+            proc = subprocess.run([cli, '-p', prompt, '--model', model_id, '--safe-mode', '--restricted', '--strict-mcp-config', '--tools', 'Read', '--allowedTools', 'Read', '--permission-mode', 'dontAsk', '--output-format', 'json', '--system-prompt', PROTOCOL['models']['Opus']['system_prompt']], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=PROTOCOL['models']['Opus']['max_request_seconds'], env=env, cwd=workdir)
         elapsed = time.perf_counter()-started
         payload = json.loads(proc.stdout)
         if proc.returncode or payload.get('is_error'):
@@ -231,8 +262,12 @@ def run_claude(index, model_id):
         coords = parsed['box']
         if not isinstance(coords, list) or len(coords) != 4 or any(isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n) or not 0 <= n <= 1 for n in coords) or coords[0] >= coords[2] or coords[1] >= coords[3]:
             raise ValueError('invalid box')
-        model = next(iter(payload.get('modelUsage', {})), model_id)
-        return {'box': coords, 'confidence': None, **score_box(coords, stage), 'seconds': elapsed, 'model': model}
+        model_usage = payload.get('modelUsage')
+        if not isinstance(model_usage,dict) or set(model_usage) != {model_id}:
+            raise RuntimeError('Claudeの応答モデルが指定したバージョンと一致しません')
+        model = model_id
+        return {'box': coords, 'confidence': None, **score_box(coords, stage), 'seconds': elapsed, 'model': model,
+                'prompt':prompt,'prepared_sha256':prepared_hashes}
     except (json.JSONDecodeError, KeyError, ValueError):
         raise RuntimeError('Claudeの矩形応答または認証情報を解釈できません') from None
     except subprocess.TimeoutExpired:
@@ -242,27 +277,43 @@ def run_sonnet(index):
     return run_claude(index, 'claude-sonnet-5-5')
 
 def run_opus(index):
-    return run_claude(index, 'claude-opus-5-5')
+    return run_claude(index, PROTOCOL['models']['Opus']['version'])
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
     def respond(self,status,data,content='application/json; charset=utf-8'):
         self.send_response(status);self.send_header('Content-Type',content);self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(data)
     def do_GET(self):
-        routes={'/':('viewer/race.html','text/html; charset=utf-8'),'/race.js':('viewer/race.js','text/javascript; charset=utf-8'),'/race.css':('viewer/race.css','text/css; charset=utf-8'),'/reference':(str(REFERENCE.relative_to(ROOT)),'image/png')}
+        if self.path == '/api/run-config':
+            try:
+                return self.respond(200,json.dumps(run_snapshot(),ensure_ascii=False).encode('utf-8'))
+            except (RuntimeError,OSError) as e:
+                return self.respond(500,json.dumps({'error':str(e)},ensure_ascii=False).encode('utf-8'))
+        routes={'/':('viewer/race.html','text/html; charset=utf-8'),'/race.js':('viewer/race.js','text/javascript; charset=utf-8'),'/race.css':('viewer/race.css','text/css; charset=utf-8'),'/protocol.json':('benchmark_protocol.json','application/json; charset=utf-8'),'/reference':(str(REFERENCE.relative_to(ROOT)),'image/png')}
         for i in range(1,6): routes[f'/stage/{i}']=(f'data/stages_v3/stage{i}.png','image/png')
         if self.path not in routes: return self.respond(404,b'Not found','text/plain')
         path,mime=routes[self.path]
-        return self.respond(200,(ROOT/path).read_bytes(),mime)
+        data=(ROOT/path).read_bytes()
+        if self.path == '/':
+            js_hash=hashlib.sha256((ROOT/'viewer/race.js').read_bytes()).hexdigest().encode('ascii')
+            css_hash=hashlib.sha256((ROOT/'viewer/race.css').read_bytes()).hexdigest().encode('ascii')
+            html_hash=hashlib.sha256(data).hexdigest().encode('ascii')
+            data=data.replace(b'__RACE_JS_SHA256__',js_hash).replace(b'__RACE_CSS_SHA256__',css_hash).replace(b'__RACE_HTML_SHA256__',html_hash)
+        return self.respond(200,data,mime)
     def do_POST(self):
-        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/opus','/api/jev-candidates','/api/clef','/api/clef-candidates'): return self.respond(404,b'Not found','text/plain')
+        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/opus','/api/jev-candidates','/api/clef','/api/clef-candidates','/api/runs'): return self.respond(404,b'Not found','text/plain')
         # Prevent browser cross-origin and DNS-rebinding requests to this local proxy.
-        if self.headers.get('Host') not in ('127.0.0.1:8765','localhost:8765') or self.headers.get('Origin') not in ('http://127.0.0.1:8765','http://localhost:8765'):
+        if self.headers.get('Host') not in (f'127.0.0.1:{PORT}',f'localhost:{PORT}') or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}',f'http://localhost:{PORT}'):
             return self.respond(403,b'{"error":"Forbidden"}')
         try:
             length=int(self.headers.get('Content-Length','0'))
-            if length>1024: raise ValueError('invalid request')
+            if length<1 or length>(65536 if self.path == '/api/runs' else 1024): raise ValueError('invalid request')
             body=json.loads(self.rfile.read(length))
+            if self.path == '/api/runs':
+                from race_records import save
+                run_snapshot()
+                result=save(body,REFERENCE,STAGES,score_box)
+                return self.respond(200,json.dumps(result,ensure_ascii=False).encode('utf-8'))
             index=body.get('stage')
             if type(index) is not int or index not in range(1,6): raise ValueError('invalid stage')
             result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/opus':run_opus,'/api/jev-candidates':run_jev_candidates,'/api/clef':run_clef,'/api/clef-candidates':run_clef_candidates}[self.path](index-1)
@@ -271,6 +322,11 @@ class Handler(BaseHTTPRequestHandler):
             message=str(e) if isinstance(e,(ValueError,RuntimeError)) else 'Jev API への接続に失敗しました'
             self.respond(502,json.dumps({'error':message},ensure_ascii=False).encode())
 
+class RaceServer(ThreadingHTTPServer):
+    # On Windows, SO_REUSEADDR can make an old and a new server share one port.
+    allow_reuse_address = False
+
 if __name__=='__main__':
-    print('Open http://127.0.0.1:8765',flush=True)
-    ThreadingHTTPServer(('127.0.0.1',8765),Handler).serve_forever()
+    httpd=RaceServer(('127.0.0.1',PORT),Handler)
+    print(f'Open http://127.0.0.1:{PORT}',flush=True)
+    httpd.serve_forever()

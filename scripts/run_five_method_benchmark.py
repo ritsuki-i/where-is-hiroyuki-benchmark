@@ -11,7 +11,7 @@ def main():
     path.parent.mkdir(exist_ok=True)
     report = {'started_at':datetime.datetime.now().astimezone().isoformat(),
               'dataset':'data/stages_v3',
-              'rule':'Jev: person coverage >= 0.5 and IoU >= 0.1; others: face box center inside approximate face box',
+              'rule':'predicted face box center lies inside approximate ground-truth face box',
               'timing':'sequential calls, wall time includes preparation, model startup, and communication',
               'models':{}}
     for name, run in [('Jev',run_jev),('Sonnet 5.5',run_sonnet),('Opus',run_opus),('YuNet + SFace',run_face),('YuNet + Jev',run_jev_candidates)]:

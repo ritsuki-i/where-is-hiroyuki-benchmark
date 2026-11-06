@@ -16,7 +16,7 @@ def main():
     path = output_dir / f'face_benchmark_{stamp}.json'
     report = {'started_at': datetime.datetime.now().astimezone().isoformat(),
               'dataset': 'data/stages_v3',
-              'rule': 'Jev: person coverage >= 0.5 and IoU >= 0.1; others: face box center inside approximate face box',
+              'rule': 'predicted face box center lies inside approximate ground-truth face box',
               'timing': 'wall time per call includes preparation and startup; models run sequentially',
               'models': {}}
 
