@@ -2,7 +2,7 @@
 import datetime
 import json
 import time
-from server import ROOT, run_clef
+from server import ROOT, run_clef_candidates
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
     for index in range(5):
         started = time.perf_counter()
         try:
-            result = run_clef(index)
+            result = run_clef_candidates(index)
         except Exception as exc:
             result = {'error':str(exc)}
         result['wall_seconds'] = time.perf_counter()-started

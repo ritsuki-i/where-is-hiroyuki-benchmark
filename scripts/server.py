@@ -139,7 +139,7 @@ def run_jev_candidates(index):
         confidence = None
     return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),**score_box(box,stage),'seconds':time.perf_counter()-start,'model':'YuNet + '+payload.get('model',MODEL)}
 
-def run_clef(index):
+def run_clef_candidates(index):
     """Select a YuNet face candidate using Cloudflare Workers AI Clef."""
     from jev_candidates import make_candidates
     start = time.perf_counter()
@@ -185,6 +185,11 @@ def run_clef(index):
     return {'box':box,'confidence':confidence,'choice':choice,'candidates':len(boxes),
             **score_box(box,stage),'seconds':time.perf_counter()-start,'model':'@cf/cloudflare/clef',
             'usage':result.get('usage')}
+
+def run_clef(index):
+    # Workers AI Clef does not accept Jev's Box question type. Do not silently
+    # substitute YuNet or a different localization protocol in the live race.
+    raise RuntimeError('ClefはJevと同じBox形式をサポートしていないため、同条件では実行できません')
 
 def run_claude(index, model_id):
     cli = shutil.which('claude.cmd') or shutil.which('claude')
@@ -250,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
         path,mime=routes[self.path]
         return self.respond(200,(ROOT/path).read_bytes(),mime)
     def do_POST(self):
-        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/opus','/api/jev-candidates','/api/clef'): return self.respond(404,b'Not found','text/plain')
+        if self.path not in ('/api/jev','/api/face','/api/sonnet','/api/opus','/api/jev-candidates','/api/clef','/api/clef-candidates'): return self.respond(404,b'Not found','text/plain')
         # Prevent browser cross-origin and DNS-rebinding requests to this local proxy.
         if self.headers.get('Host') not in ('127.0.0.1:8765','localhost:8765') or self.headers.get('Origin') not in ('http://127.0.0.1:8765','http://localhost:8765'):
             return self.respond(403,b'{"error":"Forbidden"}')
@@ -260,7 +265,7 @@ class Handler(BaseHTTPRequestHandler):
             body=json.loads(self.rfile.read(length))
             index=body.get('stage')
             if type(index) is not int or index not in range(1,6): raise ValueError('invalid stage')
-            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/opus':run_opus,'/api/jev-candidates':run_jev_candidates,'/api/clef':run_clef}[self.path](index-1)
+            result={'/api/jev':run_jev,'/api/face':run_face,'/api/sonnet':run_sonnet,'/api/opus':run_opus,'/api/jev-candidates':run_jev_candidates,'/api/clef':run_clef,'/api/clef-candidates':run_clef_candidates}[self.path](index-1)
             self.respond(200,json.dumps(result).encode())
         except (ValueError,RuntimeError,urllib.error.URLError,TimeoutError,OSError) as e:
             message=str(e) if isinstance(e,(ValueError,RuntimeError)) else 'Jev API への接続に失敗しました'

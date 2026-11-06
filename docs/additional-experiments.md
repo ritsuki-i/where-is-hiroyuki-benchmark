@@ -7,15 +7,27 @@
 | Claude Sonnet 5.5 | 4/5 | 55.97秒 | Claude Code。Opusと同じ指示で評価。 |
 | GPT-6.1 Terra | 5/5 | 52.39秒 | 別時刻にCodex CLIで画像を直接添付。 |
 | YuNet + Jev | 3/5 | 7.00秒 | YuNetの候補一覧からJevが選択。 |
+| YuNet + Clef | 2/5 | 13.48秒 | YuNetの候補一覧からClefが選択。Clef単体ではない。 |
 
 時間には準備、起動、通信を含みます。使用した5枚は小規模で、これらの数値を一般的な性能としては扱えません。
 
 - [5手法の再実験記録](../results/five_method_benchmark_20261105_155632.md)
 - [GPT-6.1 Terraの詳細記録](../results/terra_benchmark_20261105_160045.md)
 - [YuNet + Jevの別試行の記録](../results/jev_candidates_benchmark_20261105_155333.md)
+- [YuNet + Clefの詳細記録](../results/clef_benchmark_20261106_012705.md)
 - [最初の3手法の試行](../results/face_benchmark_20261105_135020.md)
 
 ## 推論画像
+
+### YuNet + Clef
+
+これはYuNetで候補を検出してからClefに選ばせた補助実験であり、Clef単体の結果ではありません。
+
+![ステージ1](media/clef-candidates-stage1.jpg)
+![ステージ2](media/clef-candidates-stage2.jpg)
+![ステージ3](media/clef-candidates-stage3.jpg)
+![ステージ4](media/clef-candidates-stage4.jpg)
+![ステージ5](media/clef-candidates-stage5.jpg)
 
 ### Sonnetを含む最初の試行
 
