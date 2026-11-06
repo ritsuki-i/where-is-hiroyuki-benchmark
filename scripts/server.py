@@ -85,7 +85,13 @@ def score_box(coords, stage, target_kind='face'):
     prediction_area = (x2-x1) * (y2-y1)
     coverage = intersection / target_area
     iou = intersection / (target_area + prediction_area - intersection)
-    correct = (coverage >= 0.5 and iou >= 0.1) if target_kind == 'person' else (target[0] <= (x1+x2)/2 <= target[2] and target[1] <= (y1+y2)/2 <= target[3])
+    if target_kind == 'person':
+        correct = coverage >= 0.5 and iou >= 0.1
+    else:
+        px1, py1, px2, py2 = stage['bbox_xyxy_approx']
+        person_area = ((px2-px1)/width) * ((py2-py1)/height)
+        center_in_face = target[0] <= (x1+x2)/2 <= target[2] and target[1] <= (y1+y2)/2 <= target[3]
+        correct = prediction_area <= 2 * person_area and (center_in_face or coverage >= 0.5)
     return {'target_box':target, 'coverage':coverage, 'iou':iou, 'correct':correct}
 
 def run_jev(index):

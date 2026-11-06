@@ -1,8 +1,8 @@
 {
-  "protocol_id": "face-search-v2",
+  "protocol_id": "person-found-v3",
   "task": "Locate the face in the scene that matches the reference character.",
   "prompt": "Find the person in the scene whose face matches the reference character. Their clothes and pose may differ. Return a tight bounding box around only the visible face in the scene, not the body or reference image.",
-  "scoring": "The predicted face box center must lie inside the approximate ground-truth face box. No box is incorrect; errors and unsupported models are not scored.",
+  "scoring": "Person found if the valid predicted box has area at most twice the approximate ground-truth person box and either its center is inside the approximate ground-truth face box or it covers at least 50% of the ground-truth face box. No box is incorrect; errors and unsupported models are not scored. Approximate boxes and thresholds make this a heuristic, not a human identity judgment.",
   "timing": "Browser wall-clock time per model from run start through the last completed response; models run concurrently and stages sequentially.",
   "direct_image_preprocessing": {"max_side": 1568, "jpeg_quality": 90},
   "models": {
