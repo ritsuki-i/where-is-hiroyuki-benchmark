@@ -52,3 +52,18 @@ button{font:inherit;cursor:pointer}
 footer{font-size:10px;color:#879386;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:1050px){.header{gap:8px}.reference small{display:none}.header-actions{font-size:10px;gap:3px 6px}#start{padding:10px}.badge{font-size:9px}.state{max-width:35%}}
 @media(max-width:700px){main{padding:5px;gap:4px}.header{flex-wrap:wrap;gap:5px}.brand{flex:1}.eyebrow,#race-status,.review-label{display:none}h1{font-size:20px}.reference{padding:3px 6px 3px 3px;font-size:11px;gap:4px}.reference img{height:62px;width:62px}.header-actions{width:100%;grid-template-columns:1fr 1fr auto;font-size:9px}.header-actions label{white-space:normal;line-height:1.25}#start{grid-column:3;grid-row:1;padding:8px;font-size:11px}.cardhead{padding:4px 6px}.model{gap:4px}.icon{width:24px;height:24px;font-size:10px}.name{font-size:clamp(14px,3vw,20px)}.badge{display:none}.cardfoot{padding:3px 5px;gap:3px}.stage-btn{width:21px;height:22px;font-size:10px}.stages{gap:2px}.time{font-size:12px}.score{font-size:10px}.state{font-size:9px;max-width:32%}footer{font-size:9px}}
+
+/* A close view of the reference face and larger labels for recordings. */
+.reference-image{width:clamp(96px,12vh,145px);height:clamp(96px,12vh,145px);flex:none;overflow:hidden;border-radius:7px;background:#f5f2e9}
+.reference .reference-image img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;transform:scale(2.7);transform-origin:50% 16%;border-radius:0}
+.reference{font-size:clamp(16px,1.3vw,22px)}
+.reference small{font-size:clamp(12px,.95vw,15px)}
+.name{font-size:clamp(24px,2.25vw,38px)}
+.state,.review-label,.score{font-size:clamp(12px,1vw,16px)}
+.time{font-size:clamp(19px,1.6vw,26px)}
+.stage-btn{width:30px;height:30px;font-size:13px}
+.frame-label,.confidence-label{font-size:clamp(11px,.9vw,15px)}
+.header-actions{font-size:clamp(12px,.9vw,15px)}
+#start{font-size:clamp(15px,1.1vw,19px)}
+@media(max-width:1050px){.reference small{display:block}.state{max-width:32%}}
+@media(max-width:700px){.reference-image{width:68px;height:68px}.reference{font-size:13px}.reference small{display:none}.name{font-size:clamp(15px,3vw,21px)}.state,.score{font-size:10px}.time{font-size:14px}.stage-btn{width:23px;height:24px;font-size:11px}.header-actions{font-size:10px}#start{font-size:11px}}

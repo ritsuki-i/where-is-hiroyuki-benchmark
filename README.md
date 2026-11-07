@@ -18,13 +18,11 @@ Jev、Clef単体、Claude Opus 5.5、顔検出・顔照合モデルのYuNet + SF
 
 ## プレイ動画 / GIF
 
-**ここにレース画面の動画またはGIFを掲載予定。**
-
-<!-- GIFを追加する場合、公開内容を確認して docs/media/race.gif に置き、次の行を有効にする。
 ![ひろゆきを探せ！ベンチマークの実行画面](docs/media/race.gif)
--->
 
-<!-- 動画を追加する場合は docs/media/race.mp4 に置き、この位置にリンクを追加する。 -->
+[動画を高画質で見る（MP4）](docs/media/race.mp4)
+
+実行ID：`15a6cdbfaac742a3b49c7fcf03213dbe`。GIFは全編を縮小して掲載しています。元の解像度ではMP4をご覧ください。[この実行のステージ別予測画像](docs/runs/15a6cdbfaac742a3b49c7fcf03213dbe/index.md)
 
 ## 比較した4手法
 
@@ -59,22 +57,22 @@ CloudflareのClefは `choice`・`noul`・`score` に対応し、Jevの `box` 形
 旧基準で撮影した動画の予測を人物発見基準で再採点した値は、[判定・実験条件の確認](docs/scoring-audit.md)に別途記録しています。
 
 <!-- BEGIN LATEST RACE -->
-実行ID：`759be9da6e3c4022a70d11fec144ae39`
+実行ID：`15a6cdbfaac742a3b49c7fcf03213dbe`
 
-実行条件：`face-search-v2`
+実行条件：`person-found-v3`
 
-保存日時：2026-11-07T04:04:49.163818+09:00
+保存日時：2026-11-07T21:02:37.458890+09:00
 
 | 手法 | 正解 | 画面の時間 | 状態 |
 |---|---:|---:|---|
-| Jev | 0 / 5 | 3.21秒 | 完了 |
-| Clef | 0 / 5 | 17.04秒 | 完了 |
-| Opus 5.5 | 4 / 5 | 46.41秒 | 完了 |
-| YuNet + SFace | 5 / 5 | 9.46秒 | 完了 |
+| Jev | 1 / 5 | 3.81秒 | 完了 |
+| Clef | 0 / 5 | 18.36秒 | 完了 |
+| Opus 5.5 | 4 / 5 | 51.22秒 | 完了 |
+| YuNet + SFace | 5 / 5 | 9.94秒 | 完了 |
 
-[この実行のステージ別予測画像](docs/runs/759be9da6e3c4022a70d11fec144ae39/index.md)
+[この実行のステージ別予測画像](docs/runs/15a6cdbfaac742a3b49c7fcf03213dbe/index.md)
 
-実行時の設定・画像・コードのSHA-256、予測枠と各ステージの結果はローカルの `results/race_759be9da6e3c4022a70d11fec144ae39.json` に保存しています。
+実行時の設定・画像・コードのSHA-256、予測枠と各ステージの結果はローカルの `results/race_15a6cdbfaac742a3b49c7fcf03213dbe.json` に保存しています。
 画面に表示した時間と正解数を記録しています。Clefは単体で4座標を選択し、不正な座標は補正せず不正解としています。
 <!-- END LATEST RACE -->
 
