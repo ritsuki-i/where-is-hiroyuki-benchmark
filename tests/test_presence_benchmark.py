@@ -11,6 +11,22 @@ import presence_benchmark as presence
 
 
 class PresenceTests(unittest.TestCase):
+    def test_face_reference_is_cropped_and_prompted(self):
+        captured = {}
+        def open_request(request, timeout):
+            captured['body'] = json.loads(request.data)
+            return io.BytesIO(json.dumps({'model': 'jev-1.14.0', 'answers': {'target': {'choice': 'present', 'confidence': 0.5}}}).encode())
+        with patch.object(presence, 'read_key', return_value='test'), patch.object(presence.urllib.request, 'urlopen', side_effect=open_request):
+            result = presence.query('Jev', ROOT / 'data/stages_v3/stage1.png', face_reference=True)
+        body = captured['body']
+        self.assertIn(presence.FACE_PROMPT, body['questions']['target']['instructions'])
+        asset = body['assets'][body['state']['reference']]
+        import base64
+        from PIL import Image
+        image = Image.open(io.BytesIO(base64.b64decode(asset['data_base64'])))
+        self.assertEqual(image.size, (908, 1000))
+        self.assertEqual(result['choice'], 'present')
+
     def test_both_models_ask_binary_question_directly(self):
         scene = ROOT / 'data' / 'stages_v3' / 'stage1.png'
         for model in ('Jev', 'Clef'):

@@ -1,4 +1,5 @@
 """Standalone yes/no presence pilot; does not modify saved video races."""
+import argparse
 import base64
 import datetime
 import hashlib
@@ -9,24 +10,34 @@ import urllib.error
 import urllib.request
 import uuid
 
-from server import ROOT, REFERENCE, STAGES, asset, read_key, read_setting
+from PIL import Image
+from server import ROOT, REFERENCE, STAGES, asset, image_asset, read_key, read_setting
 
 PROMPT = ('Does the scene contain the person whose face matches the reference character? '
           'Their clothes and pose may differ. Answer present or absent.')
 CRITERIA = {'present': 'The reference person is present in the scene.',
             'absent': 'The reference person is absent from the scene.'}
 STATE = 'The first image is the reference character. The second image is the scene.'
+FACE_CROP = (414, 105, 641, 355)
+FACE_PROMPT = ('Does the scene contain a person whose facial features match the reference face? '
+               'Compare the face, not clothes, hat, body, hairstyle or pose. '
+               'The reference is a cropped illustration of the face. Answer present or absent.')
 
 
-def query(model, scene_path):
-    reference = asset(REFERENCE)
+def query(model, scene_path, face_reference=False):
+    if face_reference:
+        face = Image.open(REFERENCE).convert('RGB').crop(FACE_CROP)
+        reference = image_asset(face.resize((face.width * 4, face.height * 4), Image.Resampling.LANCZOS))
+    else:
+        reference = asset(REFERENCE)
     scene = asset(scene_path)
+    task = FACE_PROMPT if face_reference else PROMPT
     if model == 'Jev':
         key = read_key()
         if not key:
             raise RuntimeError('TYPESAFE_API_KEY is missing')
         refs = ['reference-' + uuid.uuid4().hex, 'scene-' + uuid.uuid4().hex]
-        prompt = PROMPT + ' The scene is `scene` and the reference image is `reference`.'
+        prompt = task + ' The scene is `scene` and the reference image is `reference`.'
         body = {'model': 'jev-1.14.0', 'state': {'reference': refs[0], 'scene': refs[1]},
                 'assets': {refs[0]: reference, refs[1]: scene},
                 'questions': {'target': {'type': 'choice', 'instructions': prompt, 'criteria': CRITERIA}}}
@@ -36,7 +47,7 @@ def query(model, scene_path):
         account, token = read_setting('CLOUDFLARE_ACCOUNT_ID'), read_setting('CLOUDFLARE_API_TOKEN')
         if not token or not re.fullmatch(r'[0-9a-fA-F]{32}', account):
             raise RuntimeError('Cloudflare credentials missing or invalid')
-        prompt = PROMPT
+        prompt = task
         body = {'model': 'clef', 'images': ['data:image/jpeg;base64,' + reference['data_base64'],
                                               'data:image/jpeg;base64,' + scene['data_base64']],
                 'state': STATE, 'questions': {'target': {'type': 'choice', 'instructions': prompt, 'criteria': CRITERIA}}}
@@ -68,16 +79,20 @@ def query(model, scene_path):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--face-reference', action='store_true', help='use the documented face-only reference crop')
+    args = parser.parse_args()
     now = datetime.datetime.now().astimezone()
-    path = ROOT / 'results' / f'presence_pilot_{now:%Y%m%d_%H%M%S}.json'
+    path = ROOT / 'results' / f'presence_{"face" if args.face_reference else "pilot"}_{now:%Y%m%d_%H%M%S}.json'
     examples = [(f'data/stages_v3/{s["image"]}', 'present') for s in STAGES]
     examples += [(f'data/backgrounds/stage{i}.png', 'absent') for i in range(1, 6)]
     report = {'started_at': now.isoformat(), 'task': 'presence, not localization', 'criteria': CRITERIA,
+              'reference_crop_xyxy': FACE_CROP if args.face_reference else None,
               'clef_state': STATE, 'examples': examples, 'rows': []}
     for scene, truth in examples:
         for model in ('Jev', 'Clef'):
             try:
-                row = {'model': model, 'scene': scene, 'expected': truth, **query(model, ROOT / scene)}
+                row = {'model': model, 'scene': scene, 'expected': truth, **query(model, ROOT / scene, args.face_reference)}
                 row['correct'] = row['choice'] == truth
             except (RuntimeError, OSError, ValueError) as exc:
                 row = {'model': model, 'scene': scene, 'expected': truth, 'error': str(exc)}

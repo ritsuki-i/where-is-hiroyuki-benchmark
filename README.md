@@ -37,7 +37,7 @@ Jev、Clef単体、Claude Opus 5.5、顔検出・顔照合モデルのYuNet + SF
 
 CloudflareのClefは `choice`・`noul`・`score` に対応し、Jevの `box` 形式には対応していません。そのため4つの座標を各0〜100%の101択で、1回のAPI呼び出しで選ばせます。矩形として不正な座標は勝手に修正せず、枠なし・不正解として記録します。[Cloudflare公式仕様](https://developers.cloudflare.com/workers-ai/models/clef/)も参照してください。以前のYuNet + Clefは別方式の[補助実験](docs/additional-experiments.md)です。
 
-この座標出力の不正解は、Clefが対象の存在を判定できないことを意味しません。位置を求めない「いる／いない」の二択をJev・Clefに試した結果と確信度は、[存在判定の予備実験](docs/presence-pilot.md)に別途記録しています。
+この座標出力の不正解は、Clefが対象の存在を判定できないことを意味しません。位置を求めない「いる／いない」の二択を、全身および顔周辺を切り出した参照画像でJev・Clefに試した結果と確信度は、[存在判定の予備実験](docs/presence-pilot.md)に別途記録しています。後者もシーン全体を入力しており、顔候補は抽出していません。
 
 ## 評価方法
 
