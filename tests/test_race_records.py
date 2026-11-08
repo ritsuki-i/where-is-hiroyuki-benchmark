@@ -18,6 +18,12 @@ import race_records
 
 
 class RaceRecordTests(unittest.TestCase):
+    def test_confidence_labels_preserve_clef_coordinate_values(self):
+        self.assertEqual(race_records.confidence_label('Jev', {'confidence': 0.24}), 'Conf 24.00%')
+        axes = {'left': 0.0027, 'top': 0.0041, 'right': 0.0019, 'bottom': 0.0034}
+        self.assertEqual(race_records.confidence_label('Clef', {'axis_confidence': axes}),
+                         'Conf L:0.27% T:0.41% R:0.19% B:0.34%')
+
     def setUp(self):
         self.directory=tempfile.TemporaryDirectory()
         self.root=Path(self.directory.name)

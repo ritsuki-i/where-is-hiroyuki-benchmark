@@ -189,13 +189,30 @@ def save(payload, reference, stages, score_box):
     return {'run_id':run_id,'result_file':f'results/{out.name}'}
 
 
+def confidence_label(name, row):
+    """Show the returned confidence without combining Clef's four choices."""
+    def percent(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+            return '—'
+        return f'{value * 100:.2f}%'
+
+    if name == 'Jev':
+        return f"Conf {percent(row.get('confidence'))}"
+    if name == 'Clef':
+        axes = row.get('axis_confidence') or {}
+        return 'Conf ' + ' '.join(f'{short}:{percent(axes.get(axis))}' for short, axis in
+                                  (('L', 'left'), ('T', 'top'), ('R', 'right'), ('B', 'bottom')))
+    return ''
+
+
 def render_run(directory,run_id,models,stages):
     """Render only predictions from this saved run, with missing runs explicit."""
     directory.mkdir(parents=True,exist_ok=False)
     font_path=Path('C:/Windows/Fonts/arial.ttf')
     font=ImageFont.truetype(str(font_path),24) if font_path.exists() else ImageFont.load_default()
     index=['# このレースのステージ別結果','',f'実行ID：`{run_id}`','',
-           '赤は予測顔枠、黄は概算の正解顔枠。未実行、エラー、非対応は予測として扱いません。','']
+           '赤は予測顔枠、黄は概算の正解顔枠。未実行、エラー、非対応は予測として扱いません。',
+           'ConfはAPIの確信度。ClefはL（左）・T（上）・R（右）・B（下）の各座標の選択に対する値で、矩形全体の確信度ではありません。','']
     for i,stage in enumerate(stages):
         image=Image.open(ROOT/'data/stages_v3'/stage['image']).convert('RGB')
         width,height=image.size
@@ -226,7 +243,12 @@ def render_run(directory,run_id,models,stages):
             panel.thumbnail((panel_width,panel_height),Image.Resampling.LANCZOS)
             canvas.paste(panel,(x,y+header))
             status='MATCH' if row['correct'] else ('MISS: invalid box' if row.get('invalid_coordinates') else 'MISS: no box' if row['box'] is None else 'MISS')
-            draw.text((x+10,y+8),f"{model['name']} | {status}",font=font,fill='#171717')
+            confidence = confidence_label(model['name'], row)
+            title = f"{model['name']} | {status}" + (f' | {confidence}' if confidence else '')
+            title_font = font
+            if font_path.exists() and draw.textbbox((0,0),title,font=font)[2] > panel_width - 20:
+                title_font = ImageFont.truetype(str(font_path),18)
+            draw.text((x+10,y+8),title,font=title_font,fill='#171717')
             notes.append(f"- {model['name']}：{'正解' if row['correct'] else '不正解（座標が不正・未補正）' if row.get('invalid_coordinates') else '不正解'}")
         canvas.save(directory/f'stage{i+1}.jpg',quality=90)
         page=[f'# ステージ{i+1}','',f'実行ID：`{run_id}`','',
